@@ -9,8 +9,8 @@ from dataset import get_dataset
 
 if __name__ == "__main__":
     train_dataset, val_dataset = get_dataset()
-    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=7)
-    val_dataloader = DataLoader(val_dataset, batch_size=32, num_workers=7)
+    train_dataloader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=7)
+    val_dataloader = DataLoader(val_dataset, batch_size=512, num_workers=7)
 
     model = UNetModel()
     wandb_logger = WandbLogger(project="unet-coloring", log_model=True)
