@@ -13,8 +13,8 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(val_dataset, batch_size=32, num_workers=7)
 
     model = UNetModel()
-    wandb_logger = WandbLogger(project="unet-coloring")
+    wandb_logger = WandbLogger(project="unet-coloring", log_model=True)
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    trainer = pL.Trainer(logger=wandb_logger, max_epochs=20, callbacks=[lr_monitor])
+    trainer = pL.Trainer(logger=wandb_logger, max_epochs=500, callbacks=[lr_monitor])
     trainer.fit(model, train_dataloader, val_dataloader)
     wandb.finish()
