@@ -77,7 +77,9 @@ class UNet(nn.Module):
         self.dec1 = DecoderBlock(128, 64)
         self.head = nn.Conv2d(64, 2, 1, padding='same')
 
-        self.attn = SelfAttentionBlock(1024, num_heads=8, num_pos=16)
+        self.attn1 = SelfAttentionBlock(1024, num_heads=8, num_pos=16)
+        self.attn2 = SelfAttentionBlock(512, num_heads=8, num_pos=64)
+        self.attn3 = SelfAttentionBlock(256, num_heads=8, num_pos=256)
         
     def forward(self, x):
         x0 = self.enc0(x)
@@ -86,9 +88,11 @@ class UNet(nn.Module):
         x3 = self.enc3(x2)
         x = self.enc4(x3)
         
-        x = self.attn(x)
+        x = self.attn1(x)
         x = self.dec4(x, x3)
+        x = self.attn2(x)
         x = self.dec3(x, x2)
+        x = self.attn3(x)
         x = self.dec2(x, x1)
         x = self.dec1(x, x0)
         x = self.head(x)
