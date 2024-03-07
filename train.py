@@ -15,6 +15,6 @@ if __name__ == "__main__":
     model = UNetModel()
     wandb_logger = WandbLogger(project="unet-coloring", log_model=True)
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    trainer = pL.Trainer(logger=wandb_logger, max_epochs=500, callbacks=[lr_monitor])
+    trainer = pL.Trainer(logger=wandb_logger, max_epochs=200, callbacks=[lr_monitor])
     trainer.fit(model, train_dataloader, val_dataloader)
     wandb.finish()

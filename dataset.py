@@ -22,8 +22,11 @@ class TrainDatasetWrapper(Dataset):
             "image": Array3D(dtype="float32", shape=(96, 96, 3)),
         })).with_format("numpy")
         self.transforms = A.Compose([
+            A.RandomScale(),
+            A.Rotate(20),
             A.RandomCrop(64, 64),
             A.HorizontalFlip(p=0.5),
+            A.Blur(p=0.2),
             A.RandomBrightnessContrast(p=0.2),
         ])
 
@@ -32,7 +35,9 @@ class TrainDatasetWrapper(Dataset):
 
     def __getitem__(self, idx):
         image = self.hf_dataset[idx]["image"]
+        image /= 255.0
         image = self.transforms(image=image)["image"]
+        image *= 255.0
         hs, v = to_hsv(Image.fromarray(image.astype(np.uint8)))
         return torch.from_numpy(v), torch.from_numpy(hs)
 

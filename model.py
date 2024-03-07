@@ -99,7 +99,7 @@ class UNetModel(pL.LightningModule):
     def __init__(self):
         super().__init__()
         self.unet = UNet()
-        self.learning_rate = 1e-4
+        self.learning_rate = 3e-4
     
     def forward(self, x):
         return self.unet(x)
@@ -120,8 +120,7 @@ class UNetModel(pL.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=0)
-        # lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        #     optimizer, max_lr=self.learning_rate, total_steps=self.trainer.estimated_stepping_batches
-        # )
-        # return {"optimizer": optimizer, "lr_scheduler": {'scheduler': lr_scheduler, 'interval': 'step'}}
-        return optimizer
+        lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer, max_lr=self.learning_rate, total_steps=self.trainer.estimated_stepping_batches
+        )
+        return {"optimizer": optimizer, "lr_scheduler": {'scheduler': lr_scheduler, 'interval': 'step'}}
