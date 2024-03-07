@@ -4,3 +4,4 @@ datasets
 wandb
 Pillow
 albumentations
+matplotlib
