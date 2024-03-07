@@ -44,17 +44,17 @@ class ValDatasetWrapper(Dataset):
             examples["hs"] = hs
             examples["v"] =  v
             return examples
-        self.hf_dataset = hf_dataset.map(map_func, batched=False, features=Features({
+        self.hf_dataset = hf_dataset.map(map_func, remove_columns=["image"], batched=False, features=Features({
             "hs": Array3D(dtype="float32", shape=(2, 64, 64)),
             "v": Array3D(dtype="float32", shape=(1, 64, 64)),
-        })).with_format("numpy")
+        })).with_format("torch")
 
     def __len__(self):
         return len(self.hf_dataset)
 
     def __getitem__(self, idx):
         item = self.hf_dataset[idx]
-        return torch.from_numpy(item["v"]), torch.from_numpy(item["hs"])
+        return item["v"], item["hs"]
 
 
 def get_dataset():
