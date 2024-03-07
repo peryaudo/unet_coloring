@@ -3,3 +3,4 @@ numpy
 datasets
 wandb
 Pillow
+albumentations
