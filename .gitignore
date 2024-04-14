@@ -2,3 +2,7 @@ old_dataset
 train_images
 val_images
 .ipynb_checkpoints
+__pycache__
+flowers-102-split
+unet-coloring
+wandb
