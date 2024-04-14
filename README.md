@@ -6,6 +6,7 @@
 
 It gives color to grayscale flower images using U-Net with self-attention. [Oxford 102 Flower Dataset](https://paperswithcode.com/dataset/oxford-102-flower) is used.
 
+It works by converting the image from RGB to HSV, and training a U-Net predicting Hue and Saturation from Value.
 
 ## Usage
 
