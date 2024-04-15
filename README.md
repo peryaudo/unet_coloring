@@ -4,13 +4,13 @@
 
 ## What is this?
 
-It gives color to grayscale flower images using U-Net with self-attention. [Oxford 102 Flower Dataset](https://paperswithcode.com/dataset/oxford-102-flower) is used.
+It colors grayscale flower images using U-Net with self-attention. The model is trained on the [Oxford 102 Flower Dataset](https://paperswithcode.com/dataset/oxford-102-flower).
 
 It works by converting the image from RGB to HSV, and training a U-Net predicting Hue and Saturation from Value.
 
 ## Usage
 
-If you'd like using vast.ai, a 24GB RTX4090 or RTX3090 instance is recommended.
+If you'd like to use vast.ai for training, a 24GB RTX4090 or RTX3090 instance is recommended.
 
 Preparation:
 
