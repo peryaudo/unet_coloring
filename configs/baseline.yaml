@@ -1,6 +1,6 @@
 # 1) original code: HSV, original (batch-axis, no residual) attention
 runpod:
-  gpu: "RTX 3090"
+  gpu: "RTX A6000"
   gpu_count: 1
   cloud: community
   max_hours: 2.5
