@@ -33,7 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Iterable, Optional
 
-VERSION = "2026.11.25-1"
+VERSION = "2026.11.26-1"
 
 KEEP_CKPTS_DEFAULT = 3
 STEP_RE = re.compile(r"step_(\d{8})\.pt$")
@@ -127,9 +127,12 @@ def run_key(*parts: str, rid: Optional[str] = None) -> str:
 def make_run_id(slug: str, sha: Optional[str] = None, now: Optional[_dt.datetime] = None) -> str:
     """<YYYYMMDD>-<HHMM>-<sha7>-<slug> in UTC."""
     if sha is None:
-        sha = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        ).stdout.strip()
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            raise R2Error("not inside a git repository; pass --sha")
     slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
     if not slug:
         raise R2Error("run slug is empty")
@@ -453,6 +456,25 @@ def _cmd_write_status(a):
     print(json.dumps(st))
 
 
+def delete_run(rid: str, force: bool = False) -> int:
+    """Delete everything under runs/<rid>/ (smoke tests, aborted runs). Refuses a live run unless force."""
+    if not rid or "/" in rid:
+        raise R2Error(f"bad run id {rid!r}")
+    st = read_status(rid) or {}
+    if st.get("state") in ("starting", "running") and not force:
+        raise R2Error(f"run {rid} is {st['state']}; stop it first or pass --force")
+    keys = [o["Key"] for o in list_objects(run_key("", rid=rid) + "/")]
+    return delete_keys(keys)
+
+
+def _cmd_rm_run(a):
+    if not a.yes:
+        n = len(list_objects(run_key("", rid=a.run_id) + "/"))
+        print(f"would delete {n} objects under {key('runs', a.run_id)}/; rerun with --yes")
+        return
+    print(f"deleted {delete_run(a.run_id, force=a.force)} objects under {key('runs', a.run_id)}/")
+
+
 def _cmd_put_ckpt(a):
     print(put_ckpt(a.file, step=a.step, best=a.best, keep=a.keep))
 
@@ -494,6 +516,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="print runs/<run_id>/status.json")
     s.add_argument("run_id", nargs="?")
     s.set_defaults(fn=_cmd_status)
+
+    s = sub.add_parser("rm-run", help="delete runs/<run_id>/ (dry run without --yes)")
+    s.add_argument("run_id"), s.add_argument("--yes", action="store_true")
+    s.add_argument("--force", action="store_true", help="also delete a run whose status is starting/running")
+    s.set_defaults(fn=_cmd_rm_run)
 
     s = sub.add_parser("write-status", help="update status.json of $RUN_ID")
     s.add_argument("--state", required=True, choices=RUN_STATES)
