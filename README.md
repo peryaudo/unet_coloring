@@ -33,7 +33,7 @@ Then run the training:
 $ python3 train.py
 ```
 
-Experiment configs in [configs/](configs/) select the color space (`lab` or the older `hsv`) and the attention variant, e.g. `python3 train.py --config configs/lab.yaml`. They are also what `scripts/pod_entry.sh` runs on a RunPod GPU, with results stored in Cloudflare R2 via `tools/r2.py`.
+Experiment configs in [configs/](configs/) select the color space (`lab` or `hsv`), e.g. `python3 train.py --config configs/lab.yaml`. They are also what `scripts/pod_entry.sh` runs on a RunPod GPU, with results stored in Cloudflare R2 via `tools/r2.py`.
 
 To compare checkpoints on the validation set:
 

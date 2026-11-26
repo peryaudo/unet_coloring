@@ -1,4 +1,4 @@
-# 1) original code: HSV, original (batch-axis, no residual) attention
+# HSV color space: predict hue and saturation from value
 runpod:
   gpu: "RTX 4090"
   gpu_count: 1
@@ -8,11 +8,10 @@ runpod:
   container_disk_gb: 30
   auto_approve_under_usd: 0
 train:
-  entry: python3 train.py --config configs/baseline.yaml
+  entry: python3 train.py --config configs/hsv.yaml
   dataset: hf:huggan/flowers-102-categories@e8e6f53dc08d354a409c003af6e6df5fba2b293c
 experiment:
   color_space: hsv
-  attn_fix: false
   max_epochs: 200
   batch_size: 512
   accelerator: gpu

@@ -40,37 +40,6 @@ class DecoderBlock(nn.Module):
         return x
 
 class SelfAttentionBlock(nn.Module):
-    """Original (buggy) block.
-
-    The input is laid out as [H*W, B, C] but the attention is built with batch_first=True,
-    so it attends across the images of the batch at each pixel position instead of across
-    the pixels of one image. There is also no residual connection. Kept as-is so the
-    baseline can be reproduced.
-    """
-    def __init__(self, embed_dim, num_heads, num_pos):
-        super().__init__()
-        self.ln1 = nn.LayerNorm(embed_dim)
-        self.ln2 = nn.LayerNorm(embed_dim)
-        self.pos_embed = nn.Embedding(num_pos, embed_dim)
-        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
-        self.register_buffer('pos', torch.arange(0, num_pos))
-
-    def forward(self, x):
-        x_shape = x.shape
-        # [B,C,H,W] -> [B,C,H*W] -> [H*W,B,C]
-        x = torch.flatten(x, start_dim=2).permute(2, 0, 1)
-        # [H*W,B,C] + [H*W,1,C]
-        x = x + self.pos_embed(self.pos.view(-1, 1))
-        x = self.ln1(x)
-        x, _ = self.self_attn(x, x, x)
-        x = self.ln2(x)
-        # [H*W,B,C] -> [B,C,H*W]
-        x = x.permute(1, 2, 0)
-        # [B,C,H*W] -> [B,C,H,W]
-        x = x.view(x_shape)
-        return x
-
-class FixedSelfAttentionBlock(nn.Module):
     """Spatial self-attention over the H*W pixels of each image, pre-norm with a residual."""
     def __init__(self, embed_dim, num_heads, num_pos):
         super().__init__()
@@ -90,7 +59,7 @@ class FixedSelfAttentionBlock(nn.Module):
         return tokens.transpose(1, 2).reshape(B, C, H, W)
 
 class UNet(nn.Module):
-    def __init__(self, attn_fix=False, out_act="sigmoid"):
+    def __init__(self, out_act="sigmoid"):
         super().__init__()
         self.out_act = out_act
         self.enc0 = EncoderBlock(1, 64, has_max_pool=False)
@@ -104,10 +73,9 @@ class UNet(nn.Module):
         self.dec1 = DecoderBlock(128, 64)
         self.head = nn.Conv2d(64, 2, 1, padding='same')
 
-        Attn = FixedSelfAttentionBlock if attn_fix else SelfAttentionBlock
-        self.attn1 = Attn(1024, num_heads=8, num_pos=16)
-        self.attn2 = Attn(512, num_heads=8, num_pos=64)
-        self.attn3 = Attn(256, num_heads=8, num_pos=256)
+        self.attn1 = SelfAttentionBlock(1024, num_heads=8, num_pos=16)
+        self.attn2 = SelfAttentionBlock(512, num_heads=8, num_pos=64)
+        self.attn3 = SelfAttentionBlock(256, num_heads=8, num_pos=256)
 
     def forward(self, x):
         x0 = self.enc0(x)
@@ -131,11 +99,12 @@ class UNet(nn.Module):
         return x
 
 class UNetModel(pL.LightningModule):
-    def __init__(self, attn_fix=False, color_space="hsv", learning_rate=3e-4):
+    def __init__(self, color_space="lab", learning_rate=3e-4, **_ignored):
+        # **_ignored: hyperparameters stored by older checkpoints (e.g. attn_fix) are accepted and dropped.
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters("color_space", "learning_rate")
         # HSV targets (H, S) live in [0, 1]; Lab targets (a, b) are scaled to about [-1, 1].
-        self.unet = UNet(attn_fix=attn_fix, out_act="tanh" if color_space == "lab" else "sigmoid")
+        self.unet = UNet(out_act="tanh" if color_space == "lab" else "sigmoid")
         self.learning_rate = learning_rate
 
     def forward(self, x):

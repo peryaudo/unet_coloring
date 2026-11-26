@@ -1,13 +1,8 @@
 """Compare trained checkpoints on the same validation images with color-space-independent metrics.
 
-    python3 evaluate.py --out eval/ \
-        "1 baseline (notebook)=ckpts/baseline.pt@train" \
-        "2 + eval()=ckpts/baseline.pt" \
-        "3 + attention fix=ckpts/attnfix.pt" \
-        "4 + Lab=ckpts/lab.pt"
+    python3 evaluate.py --out eval/ "lab=ckpts/lab.ckpt" "hsv=ckpts/hsv.ckpt"
 
-Each model runs on one image at a time, as in real use. `@train` reproduces the original
-notebook, which never called model.eval() (BatchNorm uses the statistics of that single image).
+Each model runs in eval mode on one image at a time, as in real use.
 
 Metrics (all on RGB reconstructed with the ground-truth V or L channel):
   native_mse   MSE in the model's own target space (HSV hs or scaled Lab ab); not comparable across spaces
@@ -35,8 +30,8 @@ def colorfulness(rgb):
     return np.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * np.sqrt(rg.mean() ** 2 + yb.mean() ** 2)
 
 
-def evaluate(model, val, color_space, train_mode, limit=None, keep=()):
-    model.train(train_mode)
+def evaluate(model, val, color_space, limit=None, keep=()):
+    model.eval()
     n = min(limit or len(val), len(val))
     mse, psnr, ab_se, cf_pred, cf_gt, kept = [], [], [], [], [], {}
     with torch.no_grad():
@@ -70,7 +65,7 @@ def label(img, text, h=18):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("models", nargs="+", help="NAME=CKPT[@train]")
+    ap.add_argument("models", nargs="+", help="NAME=CKPT")
     ap.add_argument("--out", default="eval")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--grid", default="0,3,4,6,9,12,15,21,24,30", help="val indices to show")
@@ -81,13 +76,12 @@ def main():
     datasets, results, rows, gray_row, gt_row = {}, [], [], None, None
     for spec in a.models:
         name, _, path = spec.partition("=")
-        path, _, mode = path.partition("@")
         model = UNetModel.load_from_checkpoint(path, map_location="cpu", weights_only=False)
         cs = model.hparams.get("color_space", "hsv")
         if cs not in datasets:
             datasets[cs] = get_dataset(cs, os.environ.get("DATA_DIR"))[1]
-        m, kept = evaluate(model, datasets[cs], cs, mode == "train", a.limit, keep=set(idx))
-        m.update(name=name, ckpt=path, mode=mode or "eval", color_space=cs, attn_fix=model.hparams.get("attn_fix"))
+        m, kept = evaluate(model, datasets[cs], cs, a.limit, keep=set(idx))
+        m.update(name=name, ckpt=path, color_space=cs)
         print(json.dumps(m), flush=True)
         results.append(m)
         rows.append((name, np.concatenate([kept[i][0] for i in idx], axis=1)))

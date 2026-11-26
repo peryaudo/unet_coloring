@@ -1,4 +1,4 @@
-# 4) attention fix + Lab color space (predict ab from L)
+# Lab color space: predict a, b from L (default)
 runpod:
   gpu: "RTX 4090"
   gpu_count: 1
@@ -12,7 +12,6 @@ train:
   dataset: hf:huggan/flowers-102-categories@e8e6f53dc08d354a409c003af6e6df5fba2b293c
 experiment:
   color_space: lab
-  attn_fix: true
   max_epochs: 200
   batch_size: 512
   accelerator: gpu

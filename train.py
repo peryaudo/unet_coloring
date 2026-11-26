@@ -1,7 +1,7 @@
 """Train the colorizer.
 
     python3 train.py                                  # Lab, spatial attention, wandb
-    python3 train.py --config configs/baseline.yaml   # experiment config (used on RunPod)
+    python3 train.py --config configs/lab.yaml        # experiment config (used on RunPod)
 
 On RunPod (RUN_ID set by scripts/pod_entry.sh) metrics go to $RUN_DIR/metrics.jsonl, and
 checkpoints and sample grids are uploaded to R2 with tools/r2.py.
@@ -23,7 +23,6 @@ from dataset import get_dataset, to_rgb
 
 DEFAULTS = {
     "color_space": "lab",     # lab | hsv (original)
-    "attn_fix": True,         # False = original attention (attends across the batch, no residual)
     "max_epochs": 200,
     "batch_size": 512,
     "learning_rate": 3e-4,
@@ -136,7 +135,7 @@ def main():
                                   persistent_workers=workers > 0)
     val_dataloader = DataLoader(val_dataset, batch_size=exp["batch_size"], num_workers=workers)
 
-    model = UNetModel(attn_fix=exp["attn_fix"], color_space=exp["color_space"], learning_rate=exp["learning_rate"])
+    model = UNetModel(color_space=exp["color_space"], learning_rate=exp["learning_rate"])
 
     callbacks = [LearningRateMonitor(logging_interval='step')]
     if args.config:
