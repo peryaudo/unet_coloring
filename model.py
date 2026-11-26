@@ -30,7 +30,7 @@ class DecoderBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-    
+
     def forward(self, x, resid):
         x = F.relu(self.up_conv(x))
         assert x.shape == resid.shape
@@ -38,8 +38,15 @@ class DecoderBlock(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         return x
-    
+
 class SelfAttentionBlock(nn.Module):
+    """Original (buggy) block.
+
+    The input is laid out as [H*W, B, C] but the attention is built with batch_first=True,
+    so it attends across the images of the batch at each pixel position instead of across
+    the pixels of one image. There is also no residual connection. Kept as-is so the
+    baseline can be reproduced.
+    """
     def __init__(self, embed_dim, num_heads, num_pos):
         super().__init__()
         self.ln1 = nn.LayerNorm(embed_dim)
@@ -47,7 +54,7 @@ class SelfAttentionBlock(nn.Module):
         self.pos_embed = nn.Embedding(num_pos, embed_dim)
         self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
         self.register_buffer('pos', torch.arange(0, num_pos))
-        
+
     def forward(self, x):
         x_shape = x.shape
         # [B,C,H,W] -> [B,C,H*W] -> [H*W,B,C]
@@ -63,9 +70,29 @@ class SelfAttentionBlock(nn.Module):
         x = x.view(x_shape)
         return x
 
-class UNet(nn.Module):
-    def __init__(self):
+class FixedSelfAttentionBlock(nn.Module):
+    """Spatial self-attention over the H*W pixels of each image, pre-norm with a residual."""
+    def __init__(self, embed_dim, num_heads, num_pos):
         super().__init__()
+        self.ln = nn.LayerNorm(embed_dim)
+        self.pos_embed = nn.Embedding(num_pos, embed_dim)
+        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.register_buffer('pos', torch.arange(0, num_pos))
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        # [B,C,H,W] -> [B,H*W,C]
+        tokens = torch.flatten(x, start_dim=2).transpose(1, 2)
+        h = self.ln(tokens + self.pos_embed(self.pos)[None])
+        h, _ = self.self_attn(h, h, h, need_weights=False)
+        tokens = tokens + h
+        # [B,H*W,C] -> [B,C,H,W]
+        return tokens.transpose(1, 2).reshape(B, C, H, W)
+
+class UNet(nn.Module):
+    def __init__(self, attn_fix=False, out_act="sigmoid"):
+        super().__init__()
+        self.out_act = out_act
         self.enc0 = EncoderBlock(1, 64, has_max_pool=False)
         self.enc1 = EncoderBlock(64, 128)
         self.enc2 = EncoderBlock(128, 256)
@@ -77,17 +104,18 @@ class UNet(nn.Module):
         self.dec1 = DecoderBlock(128, 64)
         self.head = nn.Conv2d(64, 2, 1, padding='same')
 
-        self.attn1 = SelfAttentionBlock(1024, num_heads=8, num_pos=16)
-        self.attn2 = SelfAttentionBlock(512, num_heads=8, num_pos=64)
-        self.attn3 = SelfAttentionBlock(256, num_heads=8, num_pos=256)
-        
+        Attn = FixedSelfAttentionBlock if attn_fix else SelfAttentionBlock
+        self.attn1 = Attn(1024, num_heads=8, num_pos=16)
+        self.attn2 = Attn(512, num_heads=8, num_pos=64)
+        self.attn3 = Attn(256, num_heads=8, num_pos=256)
+
     def forward(self, x):
         x0 = self.enc0(x)
         x1 = self.enc1(x0)
         x2 = self.enc2(x1)
         x3 = self.enc3(x2)
         x = self.enc4(x3)
-        
+
         x = self.attn1(x)
         x = self.dec4(x, x3)
         x = self.attn2(x)
@@ -96,15 +124,20 @@ class UNet(nn.Module):
         x = self.dec2(x, x1)
         x = self.dec1(x, x0)
         x = self.head(x)
-        x = torch.sigmoid(x)
+        if self.out_act == "tanh":
+            x = torch.tanh(x)
+        else:
+            x = torch.sigmoid(x)
         return x
 
 class UNetModel(pL.LightningModule):
-    def __init__(self):
+    def __init__(self, attn_fix=False, color_space="hsv", learning_rate=3e-4):
         super().__init__()
-        self.unet = UNet()
-        self.learning_rate = 3e-4
-    
+        self.save_hyperparameters()
+        # HSV targets (H, S) live in [0, 1]; Lab targets (a, b) are scaled to about [-1, 1].
+        self.unet = UNet(attn_fix=attn_fix, out_act="tanh" if color_space == "lab" else "sigmoid")
+        self.learning_rate = learning_rate
+
     def forward(self, x):
         return self.unet(x)
 
@@ -112,9 +145,9 @@ class UNetModel(pL.LightningModule):
         x, y = batch
         y_hat = self.unet(x)
         loss = F.mse_loss(y_hat, y)
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, on_step=True, on_epoch=True)
         return loss
-    
+
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.unet(x)
