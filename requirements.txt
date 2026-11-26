@@ -1,7 +1,11 @@
-pytorch-lightning
+# torch comes from the image (runpod/pytorch) or install it separately
+pytorch-lightning==2.6.6
 numpy
-datasets
+datasets==5.2.0
+huggingface_hub
 wandb
 Pillow
-albumentations
+albumentations==2.0.8
+scikit-image==0.26.0
+pyyaml
 matplotlib
