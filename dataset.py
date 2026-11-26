@@ -1,7 +1,7 @@
 import glob
 import os
 
-from datasets import load_dataset, load_from_disk, Features, Array3D
+from datasets import load_dataset, load_from_disk, Features, Array3D, Image as HFImage
 import numpy as np
 from torch.utils.data import Dataset
 import albumentations as A
@@ -116,6 +116,9 @@ def load_split(data_dir=None):
     if not files:
         raise FileNotFoundError(f"no parquet files under {data_dir}")
     ds = load_dataset("parquet", data_files=files, split="train")
+    # The parquet files carry no HF feature metadata, so the image column may load as a plain
+    # {bytes, path} struct depending on the environment; cast so it always decodes to PIL.
+    ds = ds.cast_column("image", HFImage())
     ds = ds.remove_columns([c for c in ds.column_names if c != "image"])
     return ds.train_test_split(test_size=0.1, seed=SPLIT_SEED)
 
