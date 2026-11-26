@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pod_entry.sh - runs inside a RunPod Pod, from the repo root checked out at $GIT_SHA.
-# Bundled with the runpod-train skill; copy to <repo>/scripts/pod_entry.sh. Version: 2026.11.25-1
+# Bundled with the runpod-train skill; copy to <repo>/scripts/pod_entry.sh. Version: 2026.11.26-1
 #
 # Contract (env set by runpod_api.py launch):
 #   RUN_ID PROJECT GIT_SHA MAX_HOURS TRAIN_ENTRY      required
@@ -8,6 +8,7 @@
 #   DATASET        datasets/<name>/LATEST | datasets/<name>/vNNN | hf:<repo>@<rev> | s3-public://... | none
 #   CONFIG_PATH    repo-relative config uploaded as runs/<run_id>/config.yaml
 #   RESUME_FROM    optional R2 key (project-relative or full) of a checkpoint to resume from
+#   REQUIRE_GPU    default 1: fail before training if no CUDA GPU is visible (set 0 for CPU-only jobs)
 #   RUNPOD_POD_ID, RUNPOD_API_KEY   injected by RunPod (the key is scoped to this Pod)
 # Exported to the training command:
 #   DATA_DIR       local directory holding the dataset
@@ -109,6 +110,17 @@ python3 -m pip install -q --disable-pip-version-check boto3 >>"$LOG" 2>&1 || { F
 if [ -f requirements.txt ]; then
   python3 -m pip install -q --disable-pip-version-check -r requirements.txt >>"$LOG" 2>&1 \
     || { FINAL_MESSAGE="pip install -r requirements.txt failed"; exit 1; }
+fi
+
+# Frameworks such as Lightning silently fall back to CPU; a paid GPU Pod must not train on CPU.
+if [ "${REQUIRE_GPU:-1}" != 0 ]; then
+  if python3 -c "import torch" 2>/dev/null; then
+    gpu_check="$(python3 -c "import torch; print(torch.__version__, 'cuda', torch.version.cuda, 'available', torch.cuda.is_available())" 2>&1)"
+    log "torch: $gpu_check"
+    case "$gpu_check" in *"available True"*) ;; *) FINAL_MESSAGE="no CUDA GPU visible to torch ($gpu_check)"; exit 1 ;; esac
+  elif ! nvidia-smi -L >/dev/null 2>&1; then
+    FINAL_MESSAGE="no GPU visible (nvidia-smi failed)"; exit 1
+  fi
 fi
 
 "${R2[@]}" write-status --state running --step 0 --message "setup" >/dev/null || { FINAL_MESSAGE="cannot write to R2"; exit 1; }
