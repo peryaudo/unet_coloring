@@ -6,7 +6,9 @@
 
 It colors grayscale flower images using U-Net with self-attention. The model is trained on the [Oxford 102 Flower Dataset](https://paperswithcode.com/dataset/oxford-102-flower).
 
-It works by converting the image from RGB to HSV, and training a U-Net predicting Hue and Saturation from Value.
+It works by converting the image from RGB to CIE Lab and training a U-Net that predicts the color channels (a, b) from the lightness channel (L).
+
+The example above shows validation images (64x64): grayscale input, prediction, and ground truth.
 
 ## Usage
 
@@ -19,7 +21,7 @@ $ pip install -r requirements.txt
 $ wandb login
 ```
 
-To generate the dataset split (Oxford 102 Flower does not have train/val split):
+Optionally, save the dataset split to disk (Oxford 102 Flower does not have a train/val split; the split uses a pinned dataset revision and a fixed seed, and is made on the fly if this step is skipped):
 
 ```
 $ python3 generate_split.py
@@ -31,25 +33,15 @@ Then run the training:
 $ python3 train.py
 ```
 
+Experiment configs in [configs/](configs/) select the color space (`lab` or the older `hsv`) and the attention variant, e.g. `python3 train.py --config configs/lab.yaml`. They are also what `scripts/pod_entry.sh` runs on a RunPod GPU, with results stored in Cloudflare R2 via `tools/r2.py`.
+
+To compare checkpoints on the validation set:
+
+```
+$ python3 evaluate.py --out eval "lab=path/to/lab.ckpt" "hsv=path/to/hsv.ckpt"
+```
+
 [inference.ipynb](inference.ipynb) shows how to run the inference from a trained checkpoint.
-
-## Ablation (2026-11)
-
-Same split (seed 0), 200 epochs each on one RTX 4090; evaluated one image at a time on the 819
-validation images with `evaluate.py`. Lightning `val_loss` is in each model's own target space
-(HSV vs Lab), so use the RGB/Lab columns to compare.
-
-| step | RGB PSNR (dB) ↑ | ab RMSE ↓ | colorfulness (GT = 1.0) |
-|---|---|---|---|
-| 1. baseline as in the notebook (no `model.eval()`) | 14.45 | 34.0 | 1.07 (noise) |
-| 2. + `model.eval()` | 16.46 | 29.8 | 0.70 |
-| 3. + spatial self-attention fix (with residual) | 17.84 | 27.4 | 0.85 |
-| 4. + Lab color space (predict ab from L) | 20.94 | 18.8 | 0.72 |
-
-![](eval/comparison.png)
-
-Reproduce: `configs/{baseline,attnfix,lab}.yaml` (RunPod via `scripts/pod_entry.sh`, artifacts in R2), then
-`python3 evaluate.py --out eval "name=ckpt.pt[@train]" ...`.
 
 ## TODO
 

@@ -1,6 +1,6 @@
-from datasets import load_dataset
+from dataset import load_split
 
 if __name__ == "__main__":
-    dataset = load_dataset("huggan/flowers-102-categories")
-    dataset = dataset["train"].train_test_split(test_size=0.1)
+    # Pinned dataset revision and fixed seed (see dataset.load_split), so the split is reproducible.
+    dataset = load_split()
     dataset.save_to_disk("./flowers-102-split")
