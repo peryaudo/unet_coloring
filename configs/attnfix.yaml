@@ -1,9 +1,9 @@
 # 3) spatial self-attention with residual, still HSV
 runpod:
-  gpu: "RTX 4090"
+  gpu: "RTX 3090"
   gpu_count: 1
   cloud: community
-  max_hours: 1.5
+  max_hours: 2.5
   image: runpod/pytorch:2.2.0-cu1281-torch291-ubuntu2404
   container_disk_gb: 30
   auto_approve_under_usd: 0
