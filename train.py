@@ -1,6 +1,6 @@
 """Train the colorizer.
 
-    python3 train.py                                  # original setup (HSV, original attention), wandb
+    python3 train.py                                  # Lab, spatial attention, wandb
     python3 train.py --config configs/baseline.yaml   # experiment config (used on RunPod)
 
 On RunPod (RUN_ID set by scripts/pod_entry.sh) metrics go to $RUN_DIR/metrics.jsonl, and
@@ -22,8 +22,8 @@ from model import UNetModel
 from dataset import get_dataset, to_rgb
 
 DEFAULTS = {
-    "color_space": "hsv",     # hsv | lab
-    "attn_fix": False,
+    "color_space": "lab",     # lab | hsv (original)
+    "attn_fix": True,         # False = original attention (attends across the batch, no residual)
     "max_epochs": 200,
     "batch_size": 512,
     "learning_rate": 3e-4,
